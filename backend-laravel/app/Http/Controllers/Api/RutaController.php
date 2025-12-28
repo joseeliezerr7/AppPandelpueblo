@@ -13,7 +13,9 @@ class RutaController extends Controller
      */
     public function index()
     {
-        $rutas = Ruta::orderBy('nombre', 'asc')->get();
+        $rutas = Ruta::withCount(['pulperias', 'clientes'])
+            ->orderBy('nombre', 'asc')
+            ->get();
 
         return response()->json([
             'data' => $rutas
@@ -31,8 +33,6 @@ class RutaController extends Controller
 
         $ruta = Ruta::create([
             'nombre' => $request->nombre,
-            'cantidadPulperias' => 0,
-            'cantidadClientes' => 0,
         ]);
 
         return response()->json([
@@ -45,7 +45,9 @@ class RutaController extends Controller
      */
     public function show(string $id)
     {
-        $ruta = Ruta::with('pulperias')->findOrFail($id);
+        $ruta = Ruta::with('pulperias')
+            ->withCount(['pulperias', 'clientes'])
+            ->findOrFail($id);
 
         return response()->json([
             'data' => $ruta
@@ -94,6 +96,36 @@ class RutaController extends Controller
 
         return response()->json([
             'data' => $pulperias
+        ]);
+    }
+
+    /**
+     * Get clientes by ruta
+     */
+    public function clientes(string $id)
+    {
+        $ruta = Ruta::findOrFail($id);
+        $clientes = $ruta->clientes()
+            ->with('pulperia')
+            ->orderBy('orden', 'asc')
+            ->get()
+            ->map(function ($cliente) {
+                return [
+                    'id' => $cliente->id,
+                    'nombre' => $cliente->nombre,
+                    'direccion' => $cliente->direccion,
+                    'telefono' => $cliente->telefono,
+                    'pulperiaId' => $cliente->pulperiaId,
+                    'nombrePulperia' => $cliente->pulperia ? $cliente->pulperia->nombre : null,
+                    'latitude' => $cliente->latitude ? (float) $cliente->latitude : null,
+                    'longitude' => $cliente->longitude ? (float) $cliente->longitude : null,
+                    'usuarioId' => $cliente->usuarioId,
+                    'orden' => $cliente->orden,
+                ];
+            });
+
+        return response()->json([
+            'data' => $clientes
         ]);
     }
 }

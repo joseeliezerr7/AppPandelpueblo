@@ -145,10 +145,11 @@ class PulperiaRepository {
       );
 
       await db.rawUpdate('''
-        UPDATE pulperias 
-        SET nombre = ?, direccion = ?, telefono = ?, 
+        UPDATE pulperias
+        SET nombre = ?, direccion = ?, telefono = ?,
             rutaId = ?, orden = ?, cantidadClientes = ?,
-            sincronizado = ?, servidorId = ?, last_sync = ?, 
+            visitado = ?, fechaVisita = ?,
+            sincronizado = ?, servidorId = ?, last_sync = ?,
             verificado = ?
         WHERE id = ?
       ''', [
@@ -158,6 +159,8 @@ class PulperiaRepository {
         pulperiaActualizada.rutaId,
         pulperiaActualizada.orden,
         pulperiaActualizada.cantidadClientes,
+        pulperiaActualizada.visitado ? 1 : 0,
+        pulperiaActualizada.fechaVisita,
         0, // no sincronizado
         pulperiaActualizada.servidorId,
         null, // last_sync

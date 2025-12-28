@@ -107,20 +107,27 @@ class PulperiaProvider with ChangeNotifier {
   Future<void> updatePulperia(PulperiaModel pulperia) async {
     if (_disposed) return;
     try {
-      _setLoading(true);
+      // Actualizar localmente primero para respuesta inmediata
+      final index = _pulperias.indexWhere((p) => p.id == pulperia.id);
+      if (index != -1) {
+        _pulperias[index] = pulperia;
+        _safeNotifyListeners(); // Notificar cambio inmediatamente
+      }
+
+      // Guardar en base de datos
       await _repository.updatePulperia(pulperia);
+
       if (!_disposed) {
-        await loadPulperias();
         _error = null;
       }
     } catch (e) {
       if (!_disposed) {
         _error = 'Error al actualizar pulpería: $e';
         print(_error);
+        // Recargar datos en caso de error
+        await loadPulperias();
       }
       rethrow;
-    } finally {
-      _setLoading(false);
     }
   }
 

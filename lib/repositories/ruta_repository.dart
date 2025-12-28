@@ -20,6 +20,13 @@ class RutaRepository {
           'SELECT * FROM rutas ORDER BY id DESC'
       );
 
+      // Debug: mostrar las primeras 2 rutas RAW de la BD
+      if (maps.length > 0) {
+        for (var i = 0; i < (maps.length > 2 ? 2 : maps.length); i++) {
+          print('DEBUG BD RAW - Ruta: ${maps[i]['nombre']} - cantidadPulperias: ${maps[i]['cantidadPulperias']}, cantidadClientes: ${maps[i]['cantidadClientes']}');
+        }
+      }
+
       final List<Map<String, dynamic>> cambiosPendientes = await db.rawQuery(
           'SELECT * FROM cambios_pendientes WHERE tabla = ?',
           ['rutas']
@@ -41,6 +48,12 @@ class RutaRepository {
       }).toList();
 
       print('Rutas locales encontradas: ${rutas.length}');
+      // Debug primeras 2 rutas locales
+      if (rutas.length > 0) {
+        for (var i = 0; i < (rutas.length > 2 ? 2 : rutas.length); i++) {
+          print('DEBUG LOCAL - Ruta: ${rutas[i].nombre} - Pulperías: ${rutas[i].cantidadPulperias}, Clientes: ${rutas[i].cantidadClientes}');
+        }
+      }
       return rutas;
     } catch (e) {
       print('Error al obtener rutas locales: $e');
@@ -63,27 +76,32 @@ class RutaRepository {
           );
 
           for (var ruta in rutasServidor) {
+            // Debug primeras 2 rutas
+            if (rutasServidor.indexOf(ruta) < 2) {
+              print('DEBUG - Guardando ruta: ${ruta.nombre} - Pulperías: ${ruta.cantidadPulperias}, Clientes: ${ruta.cantidadClientes}, ServidorId: ${ruta.servidorId}');
+            }
+
             final existente = await txn.rawQuery(
                 'SELECT * FROM rutas WHERE servidorId = ? LIMIT 1',
-                [ruta.id]
+                [ruta.servidorId]
             );
 
             if (existente.isEmpty) {
               await txn.rawInsert(
-                  '''INSERT INTO rutas (nombre, cantidadPulperias, cantidadClientes, 
+                  '''INSERT INTO rutas (nombre, cantidadPulperias, cantidadClientes,
                                     servidorId, sincronizado, verificado, last_sync)
                    VALUES (?, ?, ?, ?, 1, 1, ?)''',
                   [
                     ruta.nombre,
                     ruta.cantidadPulperias,
                     ruta.cantidadClientes,
-                    ruta.id,
+                    ruta.servidorId,
                     DateTime.now().toIso8601String()
                   ]
               );
             } else {
               await txn.rawUpdate(
-                  '''UPDATE rutas 
+                  '''UPDATE rutas
                    SET nombre = ?, cantidadPulperias = ?, cantidadClientes = ?,
                        sincronizado = 1, verificado = 1, last_sync = ?
                    WHERE servidorId = ?''',
@@ -92,7 +110,7 @@ class RutaRepository {
                     ruta.cantidadPulperias,
                     ruta.cantidadClientes,
                     DateTime.now().toIso8601String(),
-                    ruta.id
+                    ruta.servidorId
                   ]
               );
             }
@@ -382,17 +400,17 @@ class RutaRepository {
         // Procesar rutas del servidor
         for (var ruta in rutasServidor) {
           final tieneCambiosPendientes = (await txn.rawQuery(
-              '''SELECT 1 FROM cambios_pendientes 
+              '''SELECT 1 FROM cambios_pendientes
                WHERE tabla = ? AND id_local IN (
                  SELECT id FROM rutas WHERE servidorId = ?
                ) LIMIT 1''',
-              ['rutas', ruta.id]
+              ['rutas', ruta.servidorId]
           )).isNotEmpty;
 
           if (!tieneCambiosPendientes) {
             final existente = await txn.rawQuery(
                 'SELECT * FROM rutas WHERE servidorId = ?',
-                [ruta.id]
+                [ruta.servidorId]
             );
 
             if (existente.isEmpty) {
@@ -404,13 +422,13 @@ class RutaRepository {
                     ruta.nombre,
                     ruta.cantidadPulperias,
                     ruta.cantidadClientes,
-                    ruta.id,
+                    ruta.servidorId,
                     DateTime.now().toIso8601String(),
                   ]
               );
             } else {
               await txn.rawUpdate(
-                  '''UPDATE rutas 
+                  '''UPDATE rutas
                    SET nombre = ?, cantidadPulperias = ?, cantidadClientes = ?,
                        sincronizado = 1, verificado = 1, last_sync = ?
                    WHERE servidorId = ?''',
@@ -419,7 +437,7 @@ class RutaRepository {
                     ruta.cantidadPulperias,
                     ruta.cantidadClientes,
                     DateTime.now().toIso8601String(),
-                    ruta.id
+                    ruta.servidorId
                   ]
               );
             }

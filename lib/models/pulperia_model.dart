@@ -10,6 +10,8 @@ class PulperiaModel {
   final String? nombreRuta;
   final int orden;
   final int cantidadClientes;
+  final bool visitado;
+  final String? fechaVisita;
   final bool sincronizado;
   final String? lastSync;
   final bool verificado;
@@ -24,6 +26,8 @@ class PulperiaModel {
     this.nombreRuta,
     this.orden = 0,
     this.cantidadClientes = 0,
+    this.visitado = false,
+    this.fechaVisita,
     this.sincronizado = false,
     this.lastSync,
     this.verificado = true,
@@ -40,6 +44,8 @@ class PulperiaModel {
       'nombreRuta': nombreRuta,
       'orden': orden,
       'cantidadClientes': cantidadClientes,
+      'visitado': visitado ? 1 : 0,
+      'fechaVisita': fechaVisita,
       'sincronizado': sincronizado ? 1 : 0,
       'last_sync': lastSync,
       'verificado': verificado ? 1 : 0,
@@ -57,6 +63,8 @@ class PulperiaModel {
       nombreRuta: map['nombreRuta'],
       orden: map['orden']?.toInt() ?? 0,
       cantidadClientes: map['cantidadClientes']?.toInt() ?? 0,
+      visitado: map['visitado'] == 1,
+      fechaVisita: map['fechaVisita'],
       sincronizado: map['sincronizado'] == 1,
       lastSync: map['last_sync'],
       verificado: map['verificado'] == 1,
@@ -78,6 +86,8 @@ class PulperiaModel {
     String? nombreRuta,
     int? orden,
     int? cantidadClientes,
+    bool? visitado,
+    String? fechaVisita,
     bool? sincronizado,
     String? lastSync,
     bool? verificado,
@@ -92,6 +102,8 @@ class PulperiaModel {
       nombreRuta: nombreRuta ?? this.nombreRuta,
       orden: orden ?? this.orden,
       cantidadClientes: cantidadClientes ?? this.cantidadClientes,
+      visitado: visitado ?? this.visitado,
+      fechaVisita: fechaVisita ?? this.fechaVisita,
       sincronizado: sincronizado ?? this.sincronizado,
       lastSync: lastSync ?? this.lastSync,
       verificado: verificado ?? this.verificado,

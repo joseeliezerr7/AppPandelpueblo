@@ -162,4 +162,14 @@ class ProductoProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  // Método para verificar si hay cambios pendientes
+  bool hayCambiosPendientes() {
+    return _productosOriginal.any((producto) => !producto.sincronizado);
+  }
+
+  // Método para obtener el número de cambios pendientes
+  int getCambiosPendientes() {
+    return _productosOriginal.where((producto) => !producto.sincronizado).length;
+  }
 }

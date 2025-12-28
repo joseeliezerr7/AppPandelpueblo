@@ -4,6 +4,10 @@ import '../models/pulperia_model.dart';
 import '../models/ruta_model.dart';
 import '../models/user_model.dart';
 import '../models/producto_model.dart';
+import '../models/cliente_model.dart';
+import '../models/pedido_model.dart';
+import '../models/cronograma_visita_model.dart';
+import '../models/visita_cliente_model.dart';
 
 class ApiService {
   final Dio _dio;
@@ -12,7 +16,7 @@ class ApiService {
   ApiService({required String baseUrl}) : _dio = Dio(BaseOptions(
     baseUrl: baseUrl,
     connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 60),
     contentType: 'application/json',
   ));
 
@@ -261,18 +265,33 @@ class ApiService {
     try {
       print('Solicitando rutas al servidor...');
       final response = await _dio.get('/api/Rutas');
-      print('Respuesta del servidor: ${response.data}');
+      print('Respuesta del servidor - primeros 2 registros:');
+      if (response.data['data'] is List && (response.data['data'] as List).isNotEmpty) {
+        print(response.data['data'].take(2).toList());
+      }
 
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data['data'] as List;
-        return data.map((item) => RutaModel(
-          id: item['id'],
-          nombre: item['nombre'],
-          cantidadPulperias: item['cantidadPulperias'] ?? 0,
-          cantidadClientes: item['cantidadClientes'] ?? 0,
-          sincronizado: true,
-          servidorId: item['id'],
-        )).toList();
+        return data.map((item) {
+          // Debug item crudo
+          if (data.indexOf(item) < 2) {
+            print('DEBUG ITEM - nombre: ${item['nombre']}, cantidadPulperias: ${item['cantidadPulperias']}, cantidadClientes: ${item['cantidadClientes']}');
+          }
+
+          final ruta = RutaModel(
+            id: null,  // El id local se asigna al insertar en BD
+            servidorId: item['id'],
+            nombre: item['nombre'],
+            cantidadPulperias: (item['cantidadPulperias'] as num?)?.toInt() ?? 0,
+            cantidadClientes: (item['cantidadClientes'] as num?)?.toInt() ?? 0,
+            sincronizado: true,
+          );
+          // Debug de las primeras 2 rutas
+          if (data.indexOf(item) < 2) {
+            print('Ruta parseada: ${ruta.nombre} - Pulperías: ${ruta.cantidadPulperias}, Clientes: ${ruta.cantidadClientes}');
+          }
+          return ruta;
+        }).toList();
       } else {
         throw Exception('Error en respuesta del servidor: ${response.statusCode}');
       }
@@ -377,6 +396,25 @@ class ApiService {
       throw Exception('Error al eliminar ruta: $e');
     }
   }
+
+  Future<List<ClienteModel>> getClientesPorRuta(int rutaId) async {
+    try {
+      print('Solicitando clientes de la ruta $rutaId al servidor...');
+      final response = await _dio.get('/api/Rutas/$rutaId/clientes');
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] as List;
+        return data.map((item) => ClienteModel.fromJson(item)).toList();
+      } else {
+        throw Exception('Error en respuesta del servidor: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getClientesPorRuta: $e');
+      throw Exception('Error al obtener clientes de la ruta: $e');
+    }
+  }
+
   // Agregar estos métodos en la clase ApiService
 
   Future<List<PulperiaModel>> getPulperias() async {
@@ -511,6 +549,483 @@ class ApiService {
     } catch (e) {
       print('Error en deletePulperia: $e');
       throw Exception('Error al eliminar pulpería: $e');
+    }
+  }
+
+  // Usuarios
+  Future<List<UserModel>> getUsuarios() async {
+    try {
+      print('Solicitando usuarios al servidor...');
+      final response = await _dio.get('/api/Usuarios');
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] as List;
+        return data.map((item) => UserModel(
+          id: item['id'],
+          nombre: item['nombre'],
+          correoElectronico: item['correoElectronico'],
+          telefono: item['telefono'] ?? '',
+          permiso: item['permiso'],
+          rutaId: item['rutaId'],
+          nombreRuta: item['nombreRuta'],
+        )).toList();
+      } else {
+        throw Exception('Error en respuesta del servidor: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getUsuarios: $e');
+      throw Exception('Error al obtener usuarios: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> createUsuario({
+    required String nombre,
+    required String email,
+    required String telefono,
+    required String permiso,
+    required String password,
+    int? rutaId,
+  }) async {
+    try {
+      print('Creando usuario en servidor...');
+      final data = {
+        'nombre': nombre,
+        'correoElectronico': email,
+        'telefono': telefono,
+        'permiso': permiso,
+        'contrasena': password,
+        if (rutaId != null) 'rutaId': rutaId,
+      };
+      print('Datos: $data');
+
+      final response = await _dio.post(
+        '/api/Usuarios',
+        data: data,
+      );
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data['data'];
+      } else {
+        throw Exception('Error al crear usuario: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en createUsuario: $e');
+      throw Exception('Error al crear usuario: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateUsuario({
+    required int id,
+    required String nombre,
+    required String email,
+    required String telefono,
+    required String permiso,
+    String? password,
+    int? rutaId,
+  }) async {
+    try {
+      print('Actualizando usuario en servidor... ID: $id');
+      final data = {
+        'nombre': nombre,
+        'correoElectronico': email,
+        'telefono': telefono,
+        'permiso': permiso,
+        if (password != null && password.isNotEmpty) 'contrasena': password,
+        'rutaId': rutaId,
+      };
+      print('Datos: $data');
+
+      final response = await _dio.put(
+        '/api/Usuarios/$id',
+        data: data,
+      );
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200) {
+        return response.data['data'];
+      } else {
+        throw Exception('Error al actualizar usuario: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en updateUsuario: $e');
+      throw Exception('Error al actualizar usuario: $e');
+    }
+  }
+
+  Future<void> deleteUsuario(int id) async {
+    try {
+      print('Eliminando usuario $id del servidor...');
+
+      final response = await _dio.delete('/api/Usuarios/$id');
+      print('Respuesta del servidor: ${response.statusCode}');
+
+      if (response.statusCode != 200 &&
+          response.statusCode != 204 &&
+          response.statusCode != 404) {
+        throw Exception('Error al eliminar usuario: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        print('Usuario no encontrado en servidor (posiblemente ya eliminado)');
+        return;
+      }
+      print('Error en deleteUsuario: $e');
+      throw Exception('Error al eliminar usuario: $e');
+    }
+  }
+
+  // ==================== CLIENTES ====================
+
+  Future<List<ClienteModel>> getClientes({int? pulperiaId}) async {
+    try {
+      print('Obteniendo clientes del servidor...');
+
+      String url = '/api/Clientes';
+      if (pulperiaId != null) {
+        url += '?pulperiaId=$pulperiaId';
+      }
+
+      final response = await _dio.get(url);
+      print('Respuesta del servidor: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => ClienteModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Error al obtener clientes: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getClientes: $e');
+      throw Exception('Error al obtener clientes: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createCliente(Map<String, dynamic> cliente) async {
+    try {
+      print('Creando cliente en servidor...');
+      print('Datos: $cliente');
+
+      final response = await _dio.post(
+        '/api/Clientes',
+        data: cliente,
+      );
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data['data'];
+      } else {
+        throw Exception('Error al crear cliente: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en createCliente: $e');
+      throw Exception('Error al crear cliente: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateCliente(int id, Map<String, dynamic> cliente) async {
+    try {
+      print('Actualizando cliente en servidor... ID: $id');
+      print('Datos: $cliente');
+
+      final response = await _dio.put(
+        '/api/Clientes/$id',
+        data: cliente,
+      );
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200) {
+        return response.data['data'];
+      } else {
+        throw Exception('Error al actualizar cliente: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en updateCliente: $e');
+      throw Exception('Error al actualizar cliente: $e');
+    }
+  }
+
+  Future<void> deleteCliente(int id) async {
+    try {
+      print('Eliminando cliente $id del servidor...');
+
+      final response = await _dio.delete('/api/Clientes/$id');
+      print('Respuesta del servidor: ${response.statusCode}');
+
+      if (response.statusCode != 200 &&
+          response.statusCode != 204 &&
+          response.statusCode != 404) {
+        throw Exception('Error al eliminar cliente: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        print('Cliente no encontrado en servidor (posiblemente ya eliminado)');
+        return;
+      }
+      print('Error en deleteCliente: $e');
+      throw Exception('Error al eliminar cliente: $e');
+    }
+  }
+
+  // ==================== PEDIDOS ====================
+
+  Future<List<PedidoModel>> getPedidos({int? clienteId, int? pulperiaId}) async {
+    try {
+      print('Obteniendo pedidos del servidor...');
+
+      String url = '/api/Pedidos';
+      List<String> params = [];
+      if (clienteId != null) params.add('clienteId=$clienteId');
+      if (pulperiaId != null) params.add('pulperiaId=$pulperiaId');
+      if (params.isNotEmpty) url += '?${params.join('&')}';
+
+      final response = await _dio.get(url);
+      print('Respuesta del servidor: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => PedidoModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Error al obtener pedidos: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getPedidos: $e');
+      throw Exception('Error al obtener pedidos: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createPedido(Map<String, dynamic> pedido) async {
+    try {
+      print('Creando pedido en servidor...');
+      print('Datos: $pedido');
+
+      final response = await _dio.post(
+        '/api/Pedidos',
+        data: pedido,
+      );
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data['data'];
+      } else {
+        throw Exception('Error al crear pedido: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en createPedido: $e');
+      throw Exception('Error al crear pedido: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> updatePedido(int id, Map<String, dynamic> pedido) async {
+    try {
+      print('Actualizando pedido en servidor... ID: $id');
+      print('Datos: $pedido');
+
+      final response = await _dio.put(
+        '/api/Pedidos/$id',
+        data: pedido,
+      );
+      print('Respuesta del servidor: ${response.data}');
+
+      if (response.statusCode == 200) {
+        return response.data['data'];
+      } else {
+        throw Exception('Error al actualizar pedido: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en updatePedido: $e');
+      throw Exception('Error al actualizar pedido: $e');
+    }
+  }
+
+  Future<void> deletePedido(int id) async {
+    try {
+      print('Eliminando pedido $id del servidor...');
+
+      final response = await _dio.delete('/api/Pedidos/$id');
+      print('Respuesta del servidor: ${response.statusCode}');
+
+      if (response.statusCode != 200 &&
+          response.statusCode != 204 &&
+          response.statusCode != 404) {
+        throw Exception('Error al eliminar pedido: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        print('Pedido no encontrado en servidor (posiblemente ya eliminado)');
+        return;
+      }
+      print('Error en deletePedido: $e');
+      throw Exception('Error al eliminar pedido: $e');
+    }
+  }
+
+  // ============================================================================
+  // CRONOGRAMA VISITAS
+  // ============================================================================
+
+  Future<List<dynamic>> getCronogramaVisitas({int? clienteId}) async {
+    try {
+      String url = '/api/CronogramaVisitas';
+      if (clienteId != null) {
+        url += '?clienteId=$clienteId';
+      }
+
+      final response = await _dio.get(url);
+      print('Cronogramas obtenidos: ${response.data['data'].length}');
+      return response.data['data'];
+    } catch (e) {
+      print('Error en getCronogramaVisitas: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> createCronogramaVisita(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post('/api/CronogramaVisitas', data: data);
+      return response.data['data'];
+    } catch (e) {
+      print('Error en createCronogramaVisita: $e');
+      throw Exception('Error al crear cronograma de visita: $e');
+    }
+  }
+
+  Future<void> updateCronogramaVisita(int id, Map<String, dynamic> data) async {
+    try {
+      await _dio.put('/api/CronogramaVisitas/$id', data: data);
+    } catch (e) {
+      print('Error en updateCronogramaVisita: $e');
+      throw Exception('Error al actualizar cronograma de visita: $e');
+    }
+  }
+
+  Future<void> deleteCronogramaVisita(int id) async {
+    try {
+      await _dio.delete('/api/CronogramaVisitas/$id');
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        print('Cronograma no encontrado en servidor');
+        return;
+      }
+      print('Error en deleteCronogramaVisita: $e');
+      throw Exception('Error al eliminar cronograma de visita: $e');
+    }
+  }
+
+  // ============================================================================
+  // VISITAS CLIENTES
+  // ============================================================================
+
+  Future<List<dynamic>> getVisitasClientes({int? clienteId, String? fechaDesde, String? fechaHasta}) async {
+    try {
+      String url = '/api/VisitasClientes?';
+      if (clienteId != null) {
+        url += 'clienteId=$clienteId&';
+      }
+      if (fechaDesde != null) {
+        url += 'fecha_desde=$fechaDesde&';
+      }
+      if (fechaHasta != null) {
+        url += 'fecha_hasta=$fechaHasta&';
+      }
+
+      final response = await _dio.get(url);
+      print('Visitas obtenidas: ${response.data['data'].length}');
+      return response.data['data'];
+    } catch (e) {
+      print('Error en getVisitasClientes: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> createVisitaCliente(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post('/api/VisitasClientes', data: data);
+      return response.data['data'];
+    } catch (e) {
+      print('Error en createVisitaCliente: $e');
+      throw Exception('Error al crear visita de cliente: $e');
+    }
+  }
+
+  Future<void> updateVisitaCliente(int id, Map<String, dynamic> data) async {
+    try {
+      await _dio.put('/api/VisitasClientes/$id', data: data);
+    } catch (e) {
+      print('Error en updateVisitaCliente: $e');
+      throw Exception('Error al actualizar visita de cliente: $e');
+    }
+  }
+
+  Future<void> deleteVisitaCliente(int id) async {
+    try {
+      await _dio.delete('/api/VisitasClientes/$id');
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        print('Visita no encontrada en servidor');
+        return;
+      }
+      print('Error en deleteVisitaCliente: $e');
+      throw Exception('Error al eliminar visita de cliente: $e');
+    }
+  }
+
+  // ============================================================================
+  // MÉTODOS PARA OBTENER DATOS POR CLIENTE
+  // ============================================================================
+
+  Future<List<CronogramaVisitaModel>> getCronogramasPorCliente(int clienteId) async {
+    try {
+      print('Obteniendo cronogramas del cliente $clienteId desde servidor...');
+      final response = await _dio.get('/api/Clientes/$clienteId/cronogramas');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] as List;
+        print('Cronogramas obtenidos: ${data.length}');
+        return data.map((item) => CronogramaVisitaModel.fromJson(item)).toList();
+      } else {
+        throw Exception('Error al obtener cronogramas: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getCronogramasPorCliente: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<VisitaClienteModel>> getVisitasPorCliente(int clienteId) async {
+    try {
+      print('Obteniendo visitas del cliente $clienteId desde servidor...');
+      final response = await _dio.get('/api/Clientes/$clienteId/visitas');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] as List;
+        print('Visitas obtenidas: ${data.length}');
+        return data.map((item) => VisitaClienteModel.fromJson(item)).toList();
+      } else {
+        throw Exception('Error al obtener visitas: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getVisitasPorCliente: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<PedidoModel>> getPedidosPorCliente(int clienteId) async {
+    try {
+      print('Obteniendo pedidos del cliente $clienteId desde servidor...');
+      final response = await _dio.get('/api/Clientes/$clienteId/pedidos');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] as List;
+        print('Pedidos obtenidos: ${data.length}');
+        return data.map((item) => PedidoModel.fromJson(item)).toList();
+      } else {
+        throw Exception('Error al obtener pedidos: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getPedidosPorCliente: $e');
+      rethrow;
     }
   }
 

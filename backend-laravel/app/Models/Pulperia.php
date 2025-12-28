@@ -54,6 +54,14 @@ class Pulperia extends Model
     }
 
     /**
+     * Get the clientes for the pulperia.
+     */
+    public function clientes()
+    {
+        return $this->hasMany(Cliente::class, 'pulperiaId');
+    }
+
+    /**
      * Get the nombre of the ruta
      */
     public function getNombreRutaAttribute()

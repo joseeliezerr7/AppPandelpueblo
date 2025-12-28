@@ -6,6 +6,8 @@ class UserModel {
   final String correoElectronico;
   final String telefono;
   final String permiso;
+  final int? rutaId;
+  final String? nombreRuta;
 
   UserModel({
     required this.id,
@@ -13,6 +15,8 @@ class UserModel {
     required this.correoElectronico,
     required this.telefono,
     required this.permiso,
+    this.rutaId,
+    this.nombreRuta,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -22,6 +26,8 @@ class UserModel {
       correoElectronico: json['correoElectronico'],
       telefono: json['telefono'],
       permiso: json['permiso'],
+      rutaId: json['rutaId'],
+      nombreRuta: json['nombreRuta'],
     );
   }
 
@@ -32,6 +38,8 @@ class UserModel {
       correoElectronico: map['correoElectronico'],
       telefono: map['telefono'],
       permiso: map['permiso'],
+      rutaId: map['rutaId'],
+      nombreRuta: map['nombreRuta'],
     );
   }
 
@@ -42,6 +50,8 @@ class UserModel {
       'correoElectronico': correoElectronico,
       'telefono': telefono,
       'permiso': permiso,
+      'rutaId': rutaId,
+      'nombreRuta': nombreRuta,
     };
   }
 
@@ -52,6 +62,28 @@ class UserModel {
       'correoElectronico': correoElectronico,
       'telefono': telefono,
       'permiso': permiso,
+      'rutaId': rutaId,
+      'nombreRuta': nombreRuta,
     };
+  }
+
+  UserModel copyWith({
+    int? id,
+    String? nombre,
+    String? correoElectronico,
+    String? telefono,
+    String? permiso,
+    int? rutaId,
+    String? nombreRuta,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      correoElectronico: correoElectronico ?? this.correoElectronico,
+      telefono: telefono ?? this.telefono,
+      permiso: permiso ?? this.permiso,
+      rutaId: rutaId ?? this.rutaId,
+      nombreRuta: nombreRuta ?? this.nombreRuta,
+    );
   }
 }

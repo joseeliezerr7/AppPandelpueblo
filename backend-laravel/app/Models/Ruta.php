@@ -24,8 +24,6 @@ class Ruta extends Model
      */
     protected $fillable = [
         'nombre',
-        'cantidadPulperias',
-        'cantidadClientes',
     ];
 
     /**
@@ -42,7 +40,21 @@ class Ruta extends Model
     }
 
     /**
-     * Get the pulperias for the ruta.
+     * Append computed attributes
+     */
+    protected $appends = ['cantidadPulperias', 'cantidadClientes'];
+
+    /**
+     * Get the usuarios (encargados) for this ruta.
+     */
+    public function usuarios()
+    {
+        return $this->hasMany(User::class, 'rutaId');
+    }
+
+    /**
+     * Get the pulperias for this ruta.
+     * Las pulperías son los clientes.
      */
     public function pulperias()
     {
@@ -50,12 +62,44 @@ class Ruta extends Model
     }
 
     /**
-     * Update pulperias and clientes count
+     * Get all clientes through pulperias.
+     */
+    public function clientes()
+    {
+        return $this->hasManyThrough(Cliente::class, Pulperia::class, 'rutaId', 'pulperiaId', 'id', 'id');
+    }
+
+    /**
+     * Get cantidad de pulperias
+     */
+    public function getCantidadPulperiasAttribute()
+    {
+        // Si existe pulperias_count (generado por withCount), usarlo
+        if (isset($this->attributes['pulperias_count'])) {
+            return $this->attributes['pulperias_count'];
+        }
+        // Si no, hacer el conteo directo
+        return $this->pulperias()->count();
+    }
+
+    /**
+     * Get cantidad de clientes
+     */
+    public function getCantidadClientesAttribute()
+    {
+        // Si existe clientes_count (generado por withCount), usarlo
+        if (isset($this->attributes['clientes_count'])) {
+            return $this->attributes['clientes_count'];
+        }
+        // Si no, hacer el conteo directo
+        return $this->clientes()->count();
+    }
+
+    /**
+     * Update counts method (called from Pulperia model)
      */
     public function updateCounts()
     {
-        $this->cantidadPulperias = $this->pulperias()->count();
-        $this->cantidadClientes = $this->pulperias()->sum('cantidadClientes');
         $this->save();
     }
 }

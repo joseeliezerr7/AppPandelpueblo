@@ -11,6 +11,10 @@ import '../Categorias/categorias_screen.dart';
 import '../Productos/productos_screen.dart';
 import '../Rutas/RutasScreen.dart';
 import '../Pulperias/pulperias_screen.dart';
+import '../Rutas/MisRutasScreen.dart';
+import '../Pedidos/pedidos_screen.dart';
+import '../Empleados/asignar_ruta_screen.dart';
+import '../Usuarios/usuarios_screen.dart';
 import '../login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -109,44 +113,58 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            // OPERACIONES DIARIAS
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'OPERACIONES',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
             ListTile(
-              leading: const Icon(Icons.shopping_cart),
+              leading: Icon(Icons.map_outlined, color: Colors.blue.shade700),
+              title: const Text('Mis Rutas'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MisRutasScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.shopping_cart_outlined, color: Colors.orange.shade700),
               title: const Text('Pedidos'),
               onTap: () {
                 Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.people),
-              title: const Text('Clientes'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.inventory),
-              title: const Text('Productos'),
-              onTap: () {
-                Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ProductosScreen()),
+                  MaterialPageRoute(builder: (_) => const PedidosScreen()),
                 );
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.route),
-              title: const Text('Rutas'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RutasScreen()),
-                );
-              },
+
+            // GESTIÓN
+            const Divider(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'GESTIÓN',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ),
             ListTile(
-              leading: const Icon(Icons.store),
+              leading: Icon(Icons.store_outlined, color: Colors.purple.shade700),
               title: const Text('Pulperías'),
               onTap: () {
                 Navigator.pop(context);
@@ -156,14 +174,78 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
-            if (user?.permiso == 'admin')
+            ListTile(
+              leading: Icon(Icons.inventory_2_outlined, color: Colors.green.shade700),
+              title: const Text('Productos'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProductosScreen()),
+                );
+              },
+            ),
+
+            // ADMINISTRACIÓN (solo admin)
+            if (user?.permiso == 'admin') ...[
+              const Divider(),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'ADMINISTRACIÓN',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
               ListTile(
-                leading: const Icon(Icons.admin_panel_settings),
+                leading: Icon(Icons.route_outlined, color: Colors.teal.shade700),
+                title: const Text('Rutas'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RutasScreen()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.people_outline, color: Colors.indigo.shade700),
                 title: const Text('Usuarios'),
                 onTap: () {
                   Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const UsuariosScreen()),
+                  );
                 },
               ),
+              ListTile(
+                leading: Icon(Icons.category_outlined, color: Colors.pink.shade700),
+                title: const Text('Categorías'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CategoriasScreen()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.assignment_ind_outlined, color: Colors.deepOrange.shade700),
+                title: const Text('Asignar Rutas'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AsignarRutaScreen()),
+                  );
+                },
+              ),
+            ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.exit_to_app),
@@ -236,78 +318,189 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Menu Grid
+            // Menu Sections
             Expanded(
-              child: GridView.count(
+              child: ListView(
                 padding: const EdgeInsets.all(16),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
                 children: [
-                  MenuCard(
-                    title: 'Pedidos',
-                    icon: Icons.shopping_cart,
-                    color: AppTheme.pedidosColor,
-                    onTap: () {},
-                  ),
-                  MenuCard(
-                    title: 'Clientes',
-                    icon: Icons.people,
-                    color: AppTheme.clientesColor,
-                    onTap: () {},
-                  ),
-                  MenuCard(
-                    title: 'Productos',
-                    icon: Icons.inventory_2_rounded,
-                    color: AppTheme.productosColor,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ProductosScreen()),
-                      );
-                    },
-                  ),
-                  MenuCard(
-                    title: 'Rutas',
-                    icon: Icons.route_rounded,
-                    color: AppTheme.rutasColor,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const RutasScreen()),
-                      );
-                    },
-                  ),
-                  MenuCard(
-                    title: 'Pulperías',
-                    icon: Icons.store_rounded,
-                    color: AppTheme.pulperiasColor,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const PulperiasScreen()),
-                      );
-                    },
-                  ),
-                  if (user?.permiso == 'admin')
-                    MenuCard(
-                      title: 'Categorías',
-                      icon: Icons.category_rounded,
-                      color: AppTheme.categoriasColor,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CategoriasScreen()),
-                        );
-                      },
+                  // SECCIÓN: OPERACIONES DIARIAS
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8, bottom: 12, top: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.work_outline, size: 20, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Text(
+                          'OPERACIONES DIARIAS',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
                     ),
-                  if (user?.permiso == 'admin')
-                    MenuCard(
-                      title: 'Usuarios',
-                      icon: Icons.admin_panel_settings_rounded,
-                      color: AppTheme.usuariosColor,
-                      onTap: () {},
+                  ),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    children: [
+                      MenuCard(
+                        title: 'Mis Rutas',
+                        icon: Icons.map_outlined,
+                        color: Colors.blue,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MisRutasScreen()),
+                          );
+                        },
+                      ),
+                      MenuCard(
+                        title: 'Pedidos',
+                        icon: Icons.shopping_cart_outlined,
+                        color: Colors.orange,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const PedidosScreen()),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // SECCIÓN: GESTIÓN
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8, bottom: 12, top: 24),
+                    child: Row(
+                      children: [
+                        Icon(Icons.business_center_outlined, size: 20, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Text(
+                          'GESTIÓN',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    children: [
+                      MenuCard(
+                        title: 'Pulperías',
+                        icon: Icons.store_outlined,
+                        color: Colors.purple,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const PulperiasScreen()),
+                          );
+                        },
+                      ),
+                      MenuCard(
+                        title: 'Productos',
+                        icon: Icons.inventory_2_outlined,
+                        color: Colors.green,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ProductosScreen()),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // SECCIÓN: ADMINISTRACIÓN (solo para admin)
+                  if (user?.permiso == 'admin') ...[
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8, bottom: 12, top: 24),
+                      child: Row(
+                        children: [
+                          Icon(Icons.admin_panel_settings_outlined, size: 20, color: Colors.grey),
+                          SizedBox(width: 8),
+                          Text(
+                            'ADMINISTRACIÓN',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      children: [
+                        MenuCard(
+                          title: 'Rutas',
+                          icon: Icons.route_outlined,
+                          color: Colors.teal,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const RutasScreen()),
+                            );
+                          },
+                        ),
+                        MenuCard(
+                          title: 'Usuarios',
+                          icon: Icons.people_outline,
+                          color: Colors.indigo,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const UsuariosScreen()),
+                            );
+                          },
+                        ),
+                        MenuCard(
+                          title: 'Categorías',
+                          icon: Icons.category_outlined,
+                          color: Colors.pink,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const CategoriasScreen()),
+                            );
+                          },
+                        ),
+                        MenuCard(
+                          title: 'Asignar Rutas',
+                          icon: Icons.assignment_ind_outlined,
+                          color: Colors.deepOrange,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AsignarRutaScreen()),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

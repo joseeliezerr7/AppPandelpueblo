@@ -9,14 +9,26 @@ import 'screens/Categorias/categorias_screen.dart';
 import 'services/api_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/database_helper.dart';
+import 'services/sync_service.dart';
+import 'providers/sync_provider.dart';
 import 'repositories/producto_repository.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/categoria_repository.dart';
 import 'repositories/ruta_repository.dart';
+import 'repositories/cliente_repository.dart';
+import 'repositories/pedido_repository.dart';
+import 'repositories/user_repository.dart';
+import 'repositories/cronograma_visita_repository.dart';
+import 'repositories/visita_cliente_repository.dart';
 import 'providers/auth_provider.dart';
 import 'providers/producto_provider.dart';
 import 'providers/categoria_provider.dart';
 import 'providers/ruta_provider.dart';
+import 'providers/cliente_provider.dart';
+import 'providers/pedido_provider.dart';
+import 'providers/user_provider.dart';
+import 'providers/cronograma_visita_provider.dart';
+import 'providers/visita_cliente_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/Productos/productos_screen.dart';
 import 'screens/Productos/producto_form_screen.dart';
@@ -27,15 +39,16 @@ void main() async {
 
   try {
     final dbHelper = DatabaseHelper.instance;
-    await dbHelper.resetDatabase();
+    // await dbHelper.resetDatabase(); // Comentado - no borrar datos en cada inicio
     await dbHelper.checkDatabaseAccess();
     print('Base de datos inicializada correctamente');
   } catch (e) {
     print('Error inicializando base de datos: $e');
   }
 
-  final apiService = ApiService(baseUrl: 'http://10.0.2.2:8000');
-  final connectivityService = ConnectivityService();
+  const serverUrl = 'http://10.0.2.2:8000';
+  final apiService = ApiService(baseUrl: serverUrl);
+  final connectivityService = ConnectivityService(serverUrl: serverUrl);
 
   runApp(
     MultiProvider(
@@ -70,6 +83,32 @@ void main() async {
           update: (context, api, dbHelper, connectivity, previous) =>
               PulperiaRepository(api, connectivity),
         ),
+
+        ProxyProvider2<ApiService, ConnectivityService, UserRepository>(
+          update: (context, api, connectivity, previous) =>
+              UserRepository(api, connectivity),
+        ),
+
+        ProxyProvider2<ApiService, ConnectivityService, ClienteRepository>(
+          update: (context, api, connectivity, previous) =>
+              ClienteRepository(api, connectivity),
+        ),
+
+        ProxyProvider2<ApiService, ConnectivityService, PedidoRepository>(
+          update: (context, api, connectivity, previous) =>
+              PedidoRepository(api, connectivity),
+        ),
+
+        ProxyProvider2<ApiService, ConnectivityService, CronogramaVisitaRepository>(
+          update: (context, api, connectivity, previous) =>
+              CronogramaVisitaRepository(api, connectivity),
+        ),
+
+        ProxyProvider2<ApiService, ConnectivityService, VisitaClienteRepository>(
+          update: (context, api, connectivity, previous) =>
+              VisitaClienteRepository(api, connectivity),
+        ),
+
         // Providers
         ChangeNotifierProxyProvider<AuthRepository, AuthProvider>(
           create: (context) => AuthProvider(
@@ -128,6 +167,68 @@ void main() async {
               rutaProvider: rutaProvider,
             ),
     ),
+
+        ChangeNotifierProxyProvider<UserRepository, UserProvider>(
+          create: (context) => UserProvider(
+            context.read<UserRepository>(),
+          ),
+          update: (context, repository, previous) =>
+              previous ?? UserProvider(repository),
+        ),
+
+        ChangeNotifierProxyProvider2<ApiService, ConnectivityService, ClienteProvider>(
+          create: (context) => ClienteProvider(
+            context.read<ApiService>(),
+            context.read<ConnectivityService>(),
+          ),
+          update: (context, apiService, connectivityService, previous) =>
+              previous ?? ClienteProvider(apiService, connectivityService),
+        ),
+
+        ChangeNotifierProxyProvider2<ApiService, ConnectivityService, PedidoProvider>(
+          create: (context) => PedidoProvider(
+            context.read<ApiService>(),
+            context.read<ConnectivityService>(),
+          ),
+          update: (context, apiService, connectivityService, previous) =>
+              previous ?? PedidoProvider(apiService, connectivityService),
+        ),
+
+        ChangeNotifierProxyProvider<CronogramaVisitaRepository, CronogramaVisitaProvider>(
+          create: (context) => CronogramaVisitaProvider(
+            context.read<CronogramaVisitaRepository>(),
+          ),
+          update: (context, repository, previous) =>
+              previous ?? CronogramaVisitaProvider(repository),
+        ),
+
+        ChangeNotifierProxyProvider<VisitaClienteRepository, VisitaClienteProvider>(
+          create: (context) => VisitaClienteProvider(
+            context.read<VisitaClienteRepository>(),
+          ),
+          update: (context, repository, previous) =>
+              previous ?? VisitaClienteProvider(repository),
+        ),
+
+        // Sync Service - debe ir al final después de todos los providers
+        ProxyProvider6<RutaProvider, CategoriaProvider, ProductoProvider, PulperiaProvider, ClienteProvider, PedidoProvider, SyncService>(
+          update: (context, rutaProvider, categoriaProvider, productoProvider, pulperiaProvider, clienteProvider, pedidoProvider, previous) =>
+            previous ?? SyncService(
+              rutaProvider: rutaProvider,
+              categoriaProvider: categoriaProvider,
+              productoProvider: productoProvider,
+              pulperiaProvider: pulperiaProvider,
+              clienteProvider: clienteProvider,
+              pedidoProvider: pedidoProvider,
+            ),
+          dispose: (context, syncService) => syncService.dispose(),
+        ),
+
+        ChangeNotifierProxyProvider<SyncService, SyncProvider>(
+          create: (context) => SyncProvider(context.read<SyncService>()),
+          update: (context, syncService, previous) =>
+            previous ?? SyncProvider(syncService),
+        ),
       ],
       child: const MyApp(),
     ),
@@ -181,36 +282,76 @@ class _AuthenticationWrapperState extends State<AuthenticationWrapper> {
         final productoProvider = context.read<ProductoProvider>();
         final categoriaProvider = context.read<CategoriaProvider>();
         final rutaProvider = context.read<RutaProvider>();
+        final pulperiaProvider = context.read<PulperiaProvider>();
+        final userProvider = context.read<UserProvider>();
         final authProvider = context.read<AuthProvider>();
 
         if (authProvider.isAuthenticated) {
+          print('Iniciando sincronización completa de datos...');
+
+          // Sincronizar todos los datos en paralelo
           await Future.wait([
             productoProvider.syncProductos(),
             categoriaProvider.syncCategorias(),
             rutaProvider.syncRutas(),
+            pulperiaProvider.syncPulperias(),
+            userProvider.cargarUsuarios(forzarSync: true),
             authProvider.syncUserData(),
           ]);
 
           if (!mounted) return;
+
+          print('Sincronización completada exitosamente');
+          print('Productos: ${productoProvider.productos.length}');
+          print('Categorías: ${categoriaProvider.categorias.length}');
+          print('Rutas: ${rutaProvider.rutas.length}');
+          print('Pulperías: ${pulperiaProvider.pulperias.length}');
+          print('Usuarios: ${userProvider.usuarios.length}');
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Sincronización completada'),
+              content: Text('Datos sincronizados correctamente'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
             ),
           );
         }
       } catch (e) {
+        print('Error en la sincronización: $e');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error en la sincronización: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
           ),
         );
         _hasSyncedOnConnect = false;
       }
     } else if (!hasConnection) {
       _hasSyncedOnConnect = false;
+
+      // Cargar datos locales aunque no haya conexión
+      try {
+        final productoProvider = context.read<ProductoProvider>();
+        final categoriaProvider = context.read<CategoriaProvider>();
+        final rutaProvider = context.read<RutaProvider>();
+        final pulperiaProvider = context.read<PulperiaProvider>();
+        final userProvider = context.read<UserProvider>();
+
+        print('Sin conexión - cargando datos locales...');
+        await Future.wait([
+          productoProvider.loadProductos(),
+          categoriaProvider.loadCategorias(),
+          rutaProvider.loadRutas(),
+          pulperiaProvider.loadPulperias(),
+          userProvider.cargarUsuarios(forzarSync: false),
+        ]);
+
+        print('Datos locales cargados');
+      } catch (e) {
+        print('Error cargando datos locales: $e');
+      }
     }
   }
 

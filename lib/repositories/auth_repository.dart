@@ -167,4 +167,85 @@ class AuthRepository {
       print('Error al sincronizar información del usuario: $e');
     }
   }
+
+  // Sincronizar todos los usuarios desde el servidor
+  Future<void> syncAllUsers() async {
+    if (!await _connectivityService.hasConnection()) {
+      print('Sin conexión - no se puede sincronizar usuarios');
+      return;
+    }
+
+    final db = await _dbHelper.database;
+
+    try {
+      print('Sincronizando usuarios desde el servidor...');
+      final usuarios = await _apiService.getUsuarios();
+
+      print('Usuarios obtenidos del servidor: ${usuarios.length}');
+
+      // Limpiar tabla de usuarios (excepto el usuario actual con sesión activa)
+      // Para preservar la contraseña del usuario actual
+      final currentUsers = await db.query('users');
+      final passwordMap = <int, String>{};
+      for (var user in currentUsers) {
+        passwordMap[user['id'] as int] = user['password'] as String;
+      }
+
+      // Insertar o actualizar cada usuario del servidor
+      for (var usuario in usuarios) {
+        // Preservar contraseña si ya existe localmente
+        final password = passwordMap[usuario.id] ?? '';
+
+        await db.insert(
+          'users',
+          {
+            'id': usuario.id,
+            'servidorId': usuario.id,
+            'nombre': usuario.nombre,
+            'correoElectronico': usuario.correoElectronico,
+            'telefono': usuario.telefono,
+            'permiso': usuario.permiso,
+            'password': password,
+            'rutaId': usuario.rutaId,
+            'nombreRuta': usuario.nombreRuta,
+            'last_sync': DateTime.now().toIso8601String(),
+            'sincronizado': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      print('${usuarios.length} usuarios sincronizados exitosamente');
+    } catch (e) {
+      print('Error al sincronizar usuarios: $e');
+      rethrow;
+    }
+  }
+
+  // Obtener todos los usuarios (priorizando servidor cuando hay conexión)
+  Future<List<UserModel>> getAllUsers() async {
+    final db = await _dbHelper.database;
+
+    // Si hay conexión, sincronizar primero
+    if (await _connectivityService.hasConnection()) {
+      try {
+        await syncAllUsers();
+      } catch (e) {
+        print('Error al sincronizar desde servidor, usando datos locales: $e');
+      }
+    }
+
+    // Leer de la base de datos local
+    final results = await db.query('users', orderBy: 'nombre');
+
+    return results.map((userData) => UserModel(
+      id: userData['id'] as int,
+      nombre: userData['nombre'] as String,
+      correoElectronico: userData['correoElectronico'] as String,
+      telefono: userData['telefono'] as String? ?? '',
+      permiso: userData['permiso'] as String,
+      rutaId: userData['rutaId'] as int?,
+      nombreRuta: userData['nombreRuta'] as String?,
+    )).toList();
+  }
 }
