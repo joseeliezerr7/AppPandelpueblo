@@ -53,31 +53,43 @@ class ClienteRepository {
     try {
       if (hasConnection) {
         print('✓ Hay conexión - Obteniendo clientes de la ruta desde servidor');
-        final clientes = await _apiService.getClientesPorRuta(rutaId);
+        try {
+          final clientes = await _apiService.getClientesPorRuta(rutaId);
 
-        // NO guardar en base de datos local para evitar problemas de FOREIGN KEY
-        // Los clientes se sincronizan mediante el método syncClientes() que maneja las dependencias correctamente
+          // NO guardar en base de datos local para evitar problemas de FOREIGN KEY
+          // Los clientes se sincronizan mediante el método syncClientes() que maneja las dependencias correctamente
 
-        return clientes;
+          return clientes;
+        } catch (e) {
+          // Si el servidor devuelve 404 (ruta no existe), intentar buscar localmente
+          if (e.toString().contains('404')) {
+            print('⚠ Ruta no encontrada en servidor (404) - Buscando clientes locales');
+            return await _getClientesLocalesPorRuta(rutaId);
+          }
+          rethrow;
+        }
       } else {
         print('✗ Sin conexión - Buscando clientes locales de la ruta');
-        // Si no hay conexión, intentar buscar desde la base de datos local
-        // Esto requiere que previamente se hayan sincronizado
-        final db = await _dbHelper.database;
-        final List<Map<String, dynamic>> maps = await db.rawQuery(
-          '''SELECT c.* FROM clientes c
-             INNER JOIN pulperias p ON c.pulperiaId = p.id
-             INNER JOIN rutas r ON p.rutaId = r.id
-             WHERE r.servidorId = ?
-             ORDER BY c.orden ASC''',
-          [rutaId],
-        );
-        return List.generate(maps.length, (i) => ClienteModel.fromMap(maps[i]));
+        return await _getClientesLocalesPorRuta(rutaId);
       }
     } catch (e) {
       print('Error al obtener clientes por ruta: $e');
       rethrow;
     }
+  }
+
+  // Helper para obtener clientes locales por ruta
+  Future<List<ClienteModel>> _getClientesLocalesPorRuta(int rutaId) async {
+    final db = await _dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery(
+      '''SELECT c.* FROM clientes c
+         INNER JOIN pulperias p ON c.pulperiaId = p.id
+         INNER JOIN rutas r ON p.rutaId = r.id
+         WHERE r.servidorId = ?
+         ORDER BY c.orden ASC''',
+      [rutaId],
+    );
+    return List.generate(maps.length, (i) => ClienteModel.fromMap(maps[i]));
   }
 
   // Obtener cliente por ID
