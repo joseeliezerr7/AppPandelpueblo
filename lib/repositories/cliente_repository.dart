@@ -61,10 +61,11 @@ class ClienteRepository {
 
           return clientes;
         } catch (e) {
-          // Si el servidor devuelve 404 (ruta no existe), intentar buscar localmente
+          // Si el servidor devuelve 404 (ruta no existe), limpiar datos locales obsoletos
           if (e.toString().contains('404')) {
-            print('⚠ Ruta no encontrada en servidor (404) - Buscando clientes locales');
-            return await _getClientesLocalesPorRuta(rutaId);
+            print('⚠ Ruta $rutaId no existe en servidor (404) - Limpiando datos locales obsoletos...');
+            await _limpiarRutaObsoleta(rutaId);
+            return []; // La ruta ya no existe, retornar lista vacía
           }
           rethrow;
         }
@@ -90,6 +91,65 @@ class ClienteRepository {
       [rutaId],
     );
     return List.generate(maps.length, (i) => ClienteModel.fromMap(maps[i]));
+  }
+
+  // Limpiar ruta obsoleta y sus dependencias cuando el servidor devuelve 404
+  Future<void> _limpiarRutaObsoleta(int servidorId) async {
+    final db = await _dbHelper.database;
+
+    try {
+      await db.transaction((txn) async {
+        // Buscar la ruta local por servidorId
+        final rutaLocal = await txn.rawQuery(
+          'SELECT id FROM rutas WHERE servidorId = ?',
+          [servidorId]
+        );
+
+        if (rutaLocal.isEmpty) {
+          print('  - Ruta con servidorId $servidorId no encontrada localmente');
+          return;
+        }
+
+        final rutaIdLocal = rutaLocal.first['id'] as int;
+        print('  - Encontrada ruta local ID: $rutaIdLocal');
+
+        // Obtener pulperías de esta ruta
+        final pulperias = await txn.rawQuery(
+          'SELECT id FROM pulperias WHERE rutaId = ?',
+          [rutaIdLocal]
+        );
+
+        if (pulperias.isNotEmpty) {
+          final idsPulperias = pulperias.map((p) => p['id']).toList();
+
+          // Eliminar clientes de estas pulperías
+          final clientesEliminados = await txn.rawDelete(
+            'DELETE FROM clientes WHERE pulperiaId IN (${idsPulperias.join(',')})'
+          );
+          print('  - Clientes eliminados: $clientesEliminados');
+
+          // Eliminar las pulperías
+          final pulperiasEliminadas = await txn.rawDelete(
+            'DELETE FROM pulperias WHERE id IN (${idsPulperias.join(',')})'
+          );
+          print('  - Pulperías eliminadas: $pulperiasEliminadas');
+        }
+
+        // Eliminar la ruta
+        await txn.rawDelete('DELETE FROM rutas WHERE id = ?', [rutaIdLocal]);
+        print('  - Ruta eliminada: $rutaIdLocal (servidorId: $servidorId)');
+
+        // Limpiar cambios pendientes relacionados
+        await txn.rawDelete(
+          'DELETE FROM cambios_pendientes WHERE tabla = ? AND id_local = ?',
+          ['rutas', rutaIdLocal]
+        );
+      });
+
+      print('✓ Limpieza de ruta obsoleta completada');
+    } catch (e) {
+      print('Error al limpiar ruta obsoleta: $e');
+    }
   }
 
   // Obtener cliente por ID
