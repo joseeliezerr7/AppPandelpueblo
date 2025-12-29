@@ -116,9 +116,42 @@ class RutaRepository {
             }
           }
 
-          await txn.rawDelete(
-              'DELETE FROM rutas WHERE verificado = 0 AND sincronizado = 1'
+          // Cascade delete: first get IDs of routes to be deleted
+          final rutasAEliminar = await txn.rawQuery(
+              'SELECT id FROM rutas WHERE verificado = 0 AND sincronizado = 1'
           );
+
+          if (rutasAEliminar.isNotEmpty) {
+            final idsRutas = rutasAEliminar.map((r) => r['id']).toList();
+            print('⚠ Eliminando ${idsRutas.length} rutas obsoletas y sus dependencias...');
+
+            // Get pulperias of these routes
+            final pulperiasAEliminar = await txn.rawQuery(
+                'SELECT id FROM pulperias WHERE rutaId IN (${idsRutas.join(',')})'
+            );
+
+            if (pulperiasAEliminar.isNotEmpty) {
+              final idsPulperias = pulperiasAEliminar.map((p) => p['id']).toList();
+
+              // Delete clientes of these pulperias
+              await txn.rawDelete(
+                  'DELETE FROM clientes WHERE pulperiaId IN (${idsPulperias.join(',')})'
+              );
+              print('  - Clientes eliminados de pulperías obsoletas');
+
+              // Delete the pulperias
+              await txn.rawDelete(
+                  'DELETE FROM pulperias WHERE id IN (${idsPulperias.join(',')})'
+              );
+              print('  - Pulperías eliminadas: ${idsPulperias.length}');
+            }
+
+            // Finally delete the routes
+            await txn.rawDelete(
+                'DELETE FROM rutas WHERE id IN (${idsRutas.join(',')})'
+            );
+            print('  - Rutas eliminadas: ${idsRutas.length}');
+          }
         });
       }
 
@@ -444,16 +477,48 @@ class RutaRepository {
           }
         }
 
-        // Eliminar rutas obsoletas
-        await txn.rawDelete('''
-          DELETE FROM rutas 
-          WHERE verificado = 0 
-            AND sincronizado = 1 
+        // Cascade delete: first get IDs of routes to be deleted
+        final rutasAEliminar = await txn.rawQuery('''
+          SELECT id FROM rutas
+          WHERE verificado = 0
+            AND sincronizado = 1
             AND id NOT IN (
-              SELECT id_local FROM cambios_pendientes 
-              WHERE tabla = 'rutas'
+              SELECT id_local FROM cambios_pendientes
+              WHERE tabla = 'rutas' AND id_local IS NOT NULL
             )
         ''');
+
+        if (rutasAEliminar.isNotEmpty) {
+          final idsRutas = rutasAEliminar.map((r) => r['id']).toList();
+          print('⚠ Eliminando ${idsRutas.length} rutas obsoletas y sus dependencias...');
+
+          // Get pulperias of these routes
+          final pulperiasAEliminar = await txn.rawQuery(
+              'SELECT id FROM pulperias WHERE rutaId IN (${idsRutas.join(',')})'
+          );
+
+          if (pulperiasAEliminar.isNotEmpty) {
+            final idsPulperias = pulperiasAEliminar.map((p) => p['id']).toList();
+
+            // Delete clientes of these pulperias
+            await txn.rawDelete(
+                'DELETE FROM clientes WHERE pulperiaId IN (${idsPulperias.join(',')})'
+            );
+            print('  - Clientes eliminados de pulperías obsoletas');
+
+            // Delete the pulperias
+            await txn.rawDelete(
+                'DELETE FROM pulperias WHERE id IN (${idsPulperias.join(',')})'
+            );
+            print('  - Pulperías eliminadas: ${idsPulperias.length}');
+          }
+
+          // Finally delete the routes
+          await txn.rawDelete(
+              'DELETE FROM rutas WHERE id IN (${idsRutas.join(',')})'
+          );
+          print('  - Rutas eliminadas: ${idsRutas.length}');
+        }
       });
 
       print('Sincronización completada exitosamente');
